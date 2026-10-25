@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "helix-agent"
+version = "0.1.0"
+description = "Autonomous IT helpdesk agent for Helix Industries (FDE take-home)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["helix_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
