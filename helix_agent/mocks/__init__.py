@@ -5,6 +5,7 @@ from helix_agent.mocks.core import (
     MissingIdempotencyKey,
     MockError,
     MockService,
+    ReadOnlyViolation,
     ReplayConflict,
     UnknownTool,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "MissingIdempotencyKey",
     "MockError",
     "MockService",
+    "ReadOnlyViolation",
     "ReplayConflict",
     "UnknownTool",
 ]

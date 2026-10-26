@@ -8,7 +8,13 @@ MockService and register one handler per tool. The base class guarantees:
   nothing. A repeat key with different args raises ReplayConflict and does
   not execute.
 - A handler that raises leaves state exactly as it was, and nothing is
-  recorded, so a retry can run it again.
+  recorded, so a retry can run it again. Because of this, a half-finished
+  action (the step-2-fails failure mode) must be built as two separate
+  calls: the first succeeds and keeps its result, the second fails. A single
+  handler that writes and then raises would be undone, hiding the partial
+  state the agent is meant to detect and roll back or flag.
+- A read-only tool that changes state raises ReadOnlyViolation, and the
+  change is undone.
 - read_state() reads the stored entity, independent of any write response,
   so callers can verify an effect instead of trusting the reply.
 
@@ -42,6 +48,14 @@ class UnknownTool(MockError):
 class MissingIdempotencyKey(MockError):
     def __init__(self, tool: str) -> None:
         super().__init__(f"{tool} changes state and requires an idempotency key")
+        self.tool = tool
+
+
+class ReadOnlyViolation(MockError):
+    """A tool registered as read-only changed state."""
+
+    def __init__(self, tool: str) -> None:
+        super().__init__(f"{tool} is registered read-only but changed state")
         self.tool = tool
 
 
@@ -98,7 +112,14 @@ class MockService:
         args = copy.deepcopy(dict(args))
 
         if not spec.mutating:
-            return copy.deepcopy(spec.handler(args))
+            # A read-only tool that writes would skip the idempotency store,
+            # so undo the write and fail loudly.
+            before = copy.deepcopy(self._state)
+            result = spec.handler(args)
+            if self._state != before:
+                self._state = before
+                raise ReadOnlyViolation(tool)
+            return copy.deepcopy(result)
 
         if not idempotency_key or not idempotency_key.strip():
             raise MissingIdempotencyKey(tool)

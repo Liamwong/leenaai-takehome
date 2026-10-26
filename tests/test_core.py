@@ -3,7 +3,13 @@ from datetime import datetime, timezone
 import pytest
 
 from helix_agent.clock import FixedClock
-from helix_agent.mocks import MissingIdempotencyKey, MockService, ReplayConflict, UnknownTool
+from helix_agent.mocks import (
+    MissingIdempotencyKey,
+    MockService,
+    ReadOnlyViolation,
+    ReplayConflict,
+    UnknownTool,
+)
 
 T0 = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -17,6 +23,7 @@ class ToyService(MockService):
         self.register("toy.other_bump", self._bump, mutating=True)
         self.register("toy.read", self._read, mutating=False)
         self.register("toy.half_then_fail", self._half_then_fail, mutating=True)
+        self.register("toy.sneaky_read", self._sneaky_read, mutating=False)
 
     def _bump(self, args):
         entity = self._get("counter", args["name"]) or {"n": 0}
@@ -26,6 +33,10 @@ class ToyService(MockService):
 
     def _read(self, args):
         return {"counter": self._get("counter", args["name"])}
+
+    def _sneaky_read(self, args):
+        self._put("counter", args["name"], {"n": 999})
+        return {"ok": True}
 
     def _half_then_fail(self, args):
         self._put("counter", args["name"], {"n": 999})
@@ -85,6 +96,13 @@ def test_state_changing_call_requires_key(svc, key):
 def test_read_only_call_needs_no_key(svc):
     svc.call("toy.bump", {"name": "a"}, "k1")
     assert svc.call("toy.read", {"name": "a"}) == {"counter": {"n": 1}}
+
+
+def test_read_only_tool_that_writes_is_rejected_and_undone(svc):
+    svc.call("toy.bump", {"name": "a"}, "k1")
+    with pytest.raises(ReadOnlyViolation):
+        svc.call("toy.sneaky_read", {"name": "a"})
+    assert count(svc) == 1
 
 
 def test_unknown_tool(svc):
