@@ -1,8 +1,8 @@
 # Helix FDE Agentic Assignment — Consolidated Context
 
-Source: `FDE_Agentic_Assignment_v2.2_Autonomous.docx` (text copy: `research/assignment.txt`).
+Source: `FDE_Agentic_Assignment_v2.2_Autonomous.docx`.
 Method: 3 Haiku readers (overview/rubric, policies, tools/dispositions/edges) → 3 Sonnet evaluators cross-checking against source → Opus synthesis (this file).
-Evaluator verdicts: A accurate (minor), C pass, B facts pass / **tags failed** (corrected below). Detail in `research/`.
+Evaluator verdicts: A accurate (minor), C pass, B facts pass / **tags failed** (corrected below). The underlying reader and evaluator notes are working material kept outside this repo.
 
 ---
 

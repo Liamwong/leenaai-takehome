@@ -13,5 +13,8 @@ dist/
 build/
 *.egg-info/
 
-# Ticket-planning artifacts live outside the repo (~/Projects/helix-fde-planning)
+# Working notes live outside the repo:
+#   ticket-planning artifacts -> ~/Projects/helix-fde-planning
+#   assignment reader/evaluator notes -> ~/Projects/helix-fde-research
 docs/planning/
+docs/research/
