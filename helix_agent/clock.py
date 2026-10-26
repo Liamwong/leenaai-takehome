@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
 
 
@@ -14,7 +14,7 @@ class Clock(Protocol):
 
 class SystemClock:
     def now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 class FixedClock:
@@ -35,7 +35,7 @@ class FixedClock:
 
 def utc_day(at: datetime) -> date:
     """The UTC calendar day of an instant (CTX §9: calendar day = UTC date)."""
-    return _require_aware(at).astimezone(timezone.utc).date()
+    return _require_aware(at).astimezone(UTC).date()
 
 
 def _require_aware(at: datetime) -> datetime:
