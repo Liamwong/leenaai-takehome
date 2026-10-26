@@ -6,6 +6,7 @@ from typing import Any
 
 from helix_agent.clock import Clock
 from helix_agent.mocks.core import InvalidArgument, MockService
+from helix_agent.mocks.directory import normalize_email
 
 ITEMS = frozenset({"Travel Exception", "USB Exception", "Software", "Peripheral Catalog"})
 INITIAL_STATE = "SUBMITTED"
@@ -26,6 +27,9 @@ class ServiceNowMock(MockService):
         requester = fields.get("requester")
         if not isinstance(requester, str) or not requester.strip():
             raise InvalidArgument("fields.requester is required")
+        # Store the lower-case form so read-backs match the directory and keys.
+        requester = normalize_email(requester)
+        fields["requester"] = requester
 
         # The counter lives in _state, so a rolled-back call also rolls back its ID.
         number = (self._get("counter", "request") or {"n": 0})["n"] + 1

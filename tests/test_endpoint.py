@@ -4,7 +4,7 @@ import pytest
 
 from helix_agent import keys
 from helix_agent.clock import FixedClock
-from helix_agent.mocks import DirectoryMock, EndpointMock, InvalidArgument
+from helix_agent.mocks import DirectoryMock, EndpointMock, InvalidArgument, UnknownEntity
 
 T0 = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
 ALICE = "alice@helix.example"
@@ -44,6 +44,17 @@ def assert_no_grant(endpoint):
 
 def test_tool_names_match_catalog(endpoint):
     assert endpoint.tools == frozenset({"endpoint.grant_admin"})
+
+
+def test_unknown_user_raises_unknown_entity_and_leaves_no_grant(endpoint):
+    with pytest.raises(UnknownEntity):
+        grant(endpoint, user="ghost@helix.example", device_id="LT-0001")
+    assert_no_grant(endpoint)
+
+
+def test_mixed_case_user_is_stored_lower_case(endpoint):
+    result = grant(endpoint, user="Alice@Helix.Example")
+    assert endpoint.read_state("admin_grant", result["id"])["user"] == ALICE
 
 
 def test_61_minutes_raises_and_leaves_no_grant(endpoint):

@@ -6,8 +6,8 @@ from datetime import timedelta
 from typing import Any
 
 from helix_agent.clock import Clock
-from helix_agent.mocks.core import InvalidArgument, MockService
-from helix_agent.mocks.directory import DirectoryMock
+from helix_agent.mocks.core import InvalidArgument, MockService, UnknownEntity
+from helix_agent.mocks.directory import DirectoryMock, normalize_email
 
 MAX_MINUTES = 60
 
@@ -20,7 +20,8 @@ class EndpointMock(MockService):
         self.register("endpoint.grant_admin", self._grant_admin, mutating=True)
 
     def _grant_admin(self, args: dict[str, Any]) -> dict[str, Any]:
-        user = args["user"]
+        # Store the directory's lower-case form so read-backs match other mocks and keys.
+        user = normalize_email(args["user"])
         device_id = args["device_id"]
         minutes = args["minutes"]
         # bool is a subclass of int, so it must be excluded explicitly.
@@ -28,6 +29,9 @@ class EndpointMock(MockService):
             raise InvalidArgument("minutes must be an int")
         if not 1 <= minutes <= MAX_MINUTES:
             raise InvalidArgument(f"minutes must be between 1 and {MAX_MINUTES}")
+        # "No such user" and "not your laptop" are separate errors so the gate can tell them apart.
+        if self.directory.read_state("user", user) is None:
+            raise UnknownEntity(f"unknown user: {user}")
         if not self.directory.owns_device(user, device_id):
             raise InvalidArgument(f"device {device_id!r} is not owned by {user}")
 

@@ -36,6 +36,13 @@ def test_only_submitted_is_a_request_state():
     assert frozenset({"SUBMITTED"}) == REQUEST_STATES
 
 
+def test_mixed_case_requester_is_stored_lower_case(snow):
+    result = create(snow, fields={"requester": "Alice@Helix.Example"})
+    stored = snow.read_state("request", result["id"])
+    assert stored["requester"] == ALICE
+    assert stored["fields"]["requester"] == ALICE
+
+
 def test_same_requester_item_day_and_key_returns_same_id(snow):
     first = create(snow)
     second = create(snow)
