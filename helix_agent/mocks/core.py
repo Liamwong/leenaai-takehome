@@ -25,9 +25,10 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from helix_agent.clock import Clock, SystemClock
 from helix_agent.keys import canonical_json

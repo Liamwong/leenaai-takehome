@@ -1,14 +1,14 @@
 """Each CTX §4 recipe: deterministic, and the key changes when (and only
 when) one of its stated components changes."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
 from helix_agent import keys
 from helix_agent.clock import FixedClock, utc_day
 
-LOCK = datetime(2026, 10, 25, 9, 30, tzinfo=timezone.utc)
+LOCK = datetime(2026, 10, 25, 9, 30, tzinfo=UTC)
 DAY = date(2026, 10, 25)
 
 # recipe -> (base kwargs, {component: changed value})
@@ -89,9 +89,11 @@ def test_unlock_ignores_everything_but_account_and_epoch():
     # Same lockout seen at a different wall-clock time is the same action.
     as_int = int(LOCK.timestamp())
     other_tz = LOCK.astimezone(timezone(timedelta(hours=-4)))
-    assert keys.unlock_account("alice@helix.example", LOCK) == keys.unlock_account(
-        "alice@helix.example", as_int
-    ) == keys.unlock_account("alice@helix.example", other_tz)
+    assert (
+        keys.unlock_account("alice@helix.example", LOCK)
+        == keys.unlock_account("alice@helix.example", as_int)
+        == keys.unlock_account("alice@helix.example", other_tz)
+    )
 
 
 def test_request_hash_ignores_param_order_but_not_values():

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -11,7 +11,7 @@ from helix_agent.mocks import (
     UnknownTool,
 )
 
-T0 = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
 
 
 class ToyService(MockService):
