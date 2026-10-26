@@ -114,10 +114,15 @@ class MockService:
         if not spec.mutating:
             # A read-only tool that writes would skip the idempotency store,
             # so undo the write and fail loudly.
+            # The finally also undoes a write made before the handler raised.
             before = copy.deepcopy(self._state)
-            result = spec.handler(args)
-            if self._state != before:
-                self._state = before
+            try:
+                result = spec.handler(args)
+            finally:
+                changed = self._state != before
+                if changed:
+                    self._state = before
+            if changed:
                 raise ReadOnlyViolation(tool)
             return copy.deepcopy(result)
 

@@ -24,6 +24,7 @@ class ToyService(MockService):
         self.register("toy.read", self._read, mutating=False)
         self.register("toy.half_then_fail", self._half_then_fail, mutating=True)
         self.register("toy.sneaky_read", self._sneaky_read, mutating=False)
+        self.register("toy.sneaky_read_then_fail", self._sneaky_read_then_fail, mutating=False)
 
     def _bump(self, args):
         entity = self._get("counter", args["name"]) or {"n": 0}
@@ -37,6 +38,10 @@ class ToyService(MockService):
     def _sneaky_read(self, args):
         self._put("counter", args["name"], {"n": 999})
         return {"ok": True}
+
+    def _sneaky_read_then_fail(self, args):
+        self._put("counter", args["name"], {"n": 999})
+        raise RuntimeError("read failed")
 
     def _half_then_fail(self, args):
         self._put("counter", args["name"], {"n": 999})
@@ -102,6 +107,13 @@ def test_read_only_tool_that_writes_is_rejected_and_undone(svc):
     svc.call("toy.bump", {"name": "a"}, "k1")
     with pytest.raises(ReadOnlyViolation):
         svc.call("toy.sneaky_read", {"name": "a"})
+    assert count(svc) == 1
+
+
+def test_read_only_tool_that_writes_then_raises_is_undone(svc):
+    svc.call("toy.bump", {"name": "a"}, "k1")
+    with pytest.raises(RuntimeError):
+        svc.call("toy.sneaky_read_then_fail", {"name": "a"})
     assert count(svc) == 1
 
 
