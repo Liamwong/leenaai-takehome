@@ -1,8 +1,8 @@
 # Helix FDE Agentic Assignment — Consolidated Context
 
-Source: `FDE_Agentic_Assignment_v2.2_Autonomous.docx` (text copy: `research/assignment.txt`).
+Source: `FDE_Agentic_Assignment_v2.2_Autonomous.docx`.
 Method: 3 Haiku readers (overview/rubric, policies, tools/dispositions/edges) → 3 Sonnet evaluators cross-checking against source → Opus synthesis (this file).
-Evaluator verdicts: A accurate (minor), C pass, B facts pass / **tags failed** (corrected below). Detail in `research/`.
+Evaluator verdicts: A accurate (minor), C pass, B facts pass / **tags failed** (corrected below). The underlying reader and evaluator notes are working material kept outside this repo.
 
 ---
 
@@ -176,3 +176,25 @@ JIRA poller ─▶ Ticket normalizer (untrusted text fenced, secrets redacted)
 - **Deadline:** Liam owns it, so it is out of scope for planning.
 - **Ticket surface:** a `TicketSource` interface with a local in-memory/JSON adapter as the default (used for evals and tests). A Jira Cloud (JSM Free) adapter is optional, for the Loom demo.
 - **LLM:** Claude, assumed and not yet confirmed.
+
+### Jira Cloud board (verified 2026-10-25)
+
+Site `liammwong99.atlassian.net`, cloudId `0e6a3f92-cc0a-4a5c-960e-cfcf2df2d145`, project `KAN` ("Liam - Testing", id 10001), team-managed board id 2. No custom fields: the requester is parsed from a `Requester: <email>` line in the description.
+
+| Status | id | Category | Disposition |
+|---|---|---|---|
+| To Do | 10003 | new | intake |
+| In Progress | 3 | indeterminate | agent working |
+| Waiting for Customer | 10004 | indeterminate | ASK_CLARIFICATION |
+| Escalated | 10006 | indeterminate | ESCALATE_INCIDENT (never Done) |
+| Pending Approval | 10005 | indeterminate | PROPOSE_FOR_APPROVAL (awaiting approval) |
+| Deferred | 10007 | indeterminate | DEFER_HUMAN |
+| Done | 10008 | done | ANSWER_ONLY / AUTO_ACTION / approved+executed |
+
+Transitions need transition IDs per issue (`listJiraIssueTransitions`), so the adapter should resolve them by target status name, not hard-code them.
+
+Quirks (checked live 2026-10-25):
+- **Transition names don't match their target statuses:** transition 31 is named "In Review" but goes to *Waiting for Customer*, and transition 4 is named "Done 2". Always match on `to.name`, never on the transition name.
+- **The workflow is wide open:** every status can be reached from every other, so Jira won't stop a bad move (e.g. Escalated → Done). The code that changes a ticket's status must enforce allowed moves itself, e.g. never moving a ticket out of Escalated to Done, and only moving to Done once the action's result is verified.
+- **Every ticket's Jira reporter is Liam,** because he creates the test tickets. So authorization must come from the `Requester:` line checked against the mock directory, never from the Jira reporter. The README should note that in production the requester comes from the logged-in reporter.
+- **KAN-1..3 are template placeholders** (Task 1, Task 2, Subtask 2.1). Delete them or have intake ignore them, and skip subtasks.
