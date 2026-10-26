@@ -17,6 +17,8 @@ MockService and register one handler per tool. The base class guarantees:
   change is undone.
 - read_state() reads the stored entity, independent of any write response,
   so callers can verify an effect instead of trusting the reply.
+- ID counters for new records must live in self._state, so that rollback
+  also rolls back the counter when a handler raises.
 
 Keys are scoped per tool. Key recipes live in helix_agent.keys.
 """
@@ -67,6 +69,14 @@ class ReplayConflict(MockError):
         super().__init__(f"{tool}: idempotency key {idempotency_key!r} reused with different args")
         self.tool = tool
         self.idempotency_key = idempotency_key
+
+
+class InvalidArgument(MockError, ValueError):
+    """A tool was called with an argument the mock's hard validation rejects."""
+
+
+class UnknownEntity(MockError, LookupError):
+    """A tool referred to a user or asset that the mock does not hold."""
 
 
 @dataclass(frozen=True)

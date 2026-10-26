@@ -176,6 +176,8 @@ JIRA poller ─▶ Ticket normalizer (untrusted text fenced, secrets redacted)
 - **Deadline:** Liam owns it, so it is out of scope for planning.
 - **Ticket surface:** a `TicketSource` interface with a local in-memory/JSON adapter as the default (used for evals and tests). A Jira Cloud (JSM Free) adapter is optional, for the Loom demo.
 - **LLM:** Claude, assumed and not yet confirmed.
+- **Mocks trust the caller's idempotency key (2026-10-26).** Mocks do not check that a key matches its `helix_agent.keys` recipe. `MockService.call` uses the key as given, and the future executor is responsible for building keys correctly. Alternative considered: a `key_fn` option on `register()` so mocks reject mismatched keys. This may not be the best choice; revisit it if a wrong key ever causes a duplicate or missed action that the mocks should have caught.
+- **Same key, different args is a conflict (2026-10-26).** A repeat call with the same idempotency key but different arguments (e.g. `create_case` re-sent with a `police_case_no` added) raises `ReplayConflict` (existing core behaviour) rather than returning the existing ID. This may not be the best choice; revisit it if callers need to add details to a retried action and find the conflict gets in the way.
 
 ### Jira Cloud board (verified 2026-10-25)
 
