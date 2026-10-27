@@ -13,7 +13,7 @@ from typing import Any
 
 from helix_agent.clock import Clock
 from helix_agent.mocks.core import InvalidArgument, MockService, UnknownEntity
-from helix_agent.mocks.directory import normalize_email
+from helix_agent.mocks.directory import email_args, normalize_email
 
 RISK_FLAGS = ("compromise", "mfa_fatigue", "impossible_travel")
 
@@ -40,12 +40,18 @@ class OktaMock(MockService):
         # Kept so reset() can restore the seed rather than leave no accounts.
         self._seed = copy.deepcopy(dict(accounts or {}))
         self._load(self._seed)
-        self.register("okta.risk_signals", self._risk_signals, mutating=False)
-        self.register("okta.unlock_account", self._unlock_account, mutating=True)
-        self.register("okta.send_password_reset", self._send_password_reset, mutating=True)
-        self.register("okta.revoke_sessions", self._revoke_sessions, mutating=True)
-        self.register("okta.force_password_reset", self._force_password_reset, mutating=True)
-        self.register("okta.disable_mfa", self._disable_mfa, mutating=True)
+        # Every Okta tool takes a user email, so all of them normalize it the same way.
+        user = email_args(("user",))
+        self.register("okta.risk_signals", self._risk_signals, mutating=False, normalize=user)
+        self.register("okta.unlock_account", self._unlock_account, mutating=True, normalize=user)
+        self.register(
+            "okta.send_password_reset", self._send_password_reset, mutating=True, normalize=user
+        )
+        self.register("okta.revoke_sessions", self._revoke_sessions, mutating=True, normalize=user)
+        self.register(
+            "okta.force_password_reset", self._force_password_reset, mutating=True, normalize=user
+        )
+        self.register("okta.disable_mfa", self._disable_mfa, mutating=True, normalize=user)
 
     def reset(self) -> None:
         super().reset()

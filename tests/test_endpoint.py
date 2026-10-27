@@ -94,3 +94,27 @@ def test_rejected_call_does_not_consume_a_grant_id(endpoint):
 def test_repeat_key_returns_same_grant(endpoint):
     assert grant(endpoint) == grant(endpoint)
     assert len(endpoint.snapshot()["state"]["admin_grant"]) == 1
+
+
+def test_mixed_case_retry_with_same_key_returns_same_grant(endpoint):
+    first = grant(endpoint, user=ALICE)
+    second = grant(endpoint, user="Alice@Helix.Example")
+    assert first == second
+    assert len(endpoint.snapshot()["state"]["admin_grant"]) == 1
+
+
+def test_missing_user_is_rejected_and_leaves_no_grant(endpoint):
+    # The normalizer leaves a missing user alone, so the handler's own lookup must fail.
+    with pytest.raises(KeyError):
+        endpoint.call(
+            "endpoint.grant_admin",
+            {"device_id": "LT-0001", "minutes": 30, "session_id": SESSION},
+            KEY,
+        )
+    assert_no_grant(endpoint)
+
+
+def test_non_string_user_is_rejected_and_leaves_no_grant(endpoint):
+    with pytest.raises(UnknownEntity):
+        grant(endpoint, user=12345)
+    assert_no_grant(endpoint)

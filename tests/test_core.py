@@ -14,6 +14,10 @@ from helix_agent.mocks import (
 T0 = datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
 
 
+def lower_name(args):
+    return {**args, "name": args["name"].lower()}
+
+
 class ToyService(MockService):
     """Counts state changes so tests can prove exactly-once execution."""
 
@@ -25,6 +29,13 @@ class ToyService(MockService):
         self.register("toy.half_then_fail", self._half_then_fail, mutating=True)
         self.register("toy.sneaky_read", self._sneaky_read, mutating=False)
         self.register("toy.sneaky_read_then_fail", self._sneaky_read_then_fail, mutating=False)
+        self.seen: list[dict] = []
+        self.register("toy.named_bump", self._named_bump, mutating=True, normalize=lower_name)
+        self.register("toy.named_read", self._read, mutating=False, normalize=lower_name)
+
+    def _named_bump(self, args):
+        self.seen.append(args)
+        return self._bump(args)
 
     def _bump(self, args):
         entity = self._get("counter", args["name"]) or {"n": 0}
@@ -83,6 +94,35 @@ def test_repeat_key_different_args_raises_and_does_not_execute(svc):
         svc.call("toy.bump", {"name": "a", "by": 5}, "k1")
     assert exc.value.tool == "toy.bump" and exc.value.idempotency_key == "k1"
     assert count(svc) == 1
+
+
+def test_without_normalize_hook_case_difference_is_a_conflict(svc):
+    svc.call("toy.bump", {"name": "Alpha"}, "k1")
+    with pytest.raises(ReplayConflict):
+        svc.call("toy.bump", {"name": "alpha"}, "k1")
+    assert count(svc, "Alpha") == 1
+
+
+def test_normalize_hook_makes_case_only_difference_replay(svc):
+    first = svc.call("toy.named_bump", {"name": "Alpha"}, "k1")
+    second = svc.call("toy.named_bump", {"name": "alpha"}, "k1")
+    assert first == second == {"ok": True, "n": 1}
+    assert count(svc, "alpha") == 1
+    # The handler ran once, and it received the normalized args.
+    assert svc.seen == [{"name": "alpha"}]
+
+
+def test_normalize_hook_still_rejects_genuinely_different_args(svc):
+    svc.call("toy.named_bump", {"name": "Alpha"}, "k1")
+    with pytest.raises(ReplayConflict):
+        svc.call("toy.named_bump", {"name": "Beta"}, "k1")
+    assert count(svc, "alpha") == 1
+    assert count(svc, "beta") == 0
+
+
+def test_normalize_hook_applies_to_read_only_tools(svc):
+    svc.call("toy.bump", {"name": "alpha"}, "k1")
+    assert svc.call("toy.named_read", {"name": "ALPHA"}) == {"counter": {"n": 1}}
 
 
 def test_keys_are_scoped_per_tool(svc):

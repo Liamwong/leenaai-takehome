@@ -11,12 +11,33 @@ from collections.abc import Mapping
 from typing import Any
 
 from helix_agent.clock import Clock
-from helix_agent.mocks.core import InvalidArgument, MockService, UnknownEntity
+from helix_agent.mocks.core import InvalidArgument, MockService, Normalizer, UnknownEntity
 
 
 def normalize_email(email: str) -> str:
     # Matches helix_agent.keys: emails are case-insensitive, so store and look up lower-case.
     return email.strip().lower()
+
+
+def email_args(*paths: tuple[str, ...]) -> Normalizer:
+    """Build a register(normalize=...) hook that lower-cases the email at each key path.
+
+    A path like ("fields", "requester") walks nested dicts. A missing or non-string
+    value is left alone so the handler's own validation still reports it.
+    """
+
+    def normalize(args: dict[str, Any]) -> dict[str, Any]:
+        out = copy.deepcopy(args)
+        for path in paths:
+            node: Any = out
+            for key in path[:-1]:
+                node = node.get(key) if isinstance(node, dict) else None
+            leaf = path[-1]
+            if isinstance(node, dict) and isinstance(node.get(leaf), str):
+                node[leaf] = normalize_email(node[leaf])
+        return out
+
+    return normalize
 
 
 class DirectoryMock(MockService):
@@ -27,8 +48,18 @@ class DirectoryMock(MockService):
         # Kept so reset() can restore the seed rather than leave an empty directory.
         self._seed = copy.deepcopy(dict(users or {}))
         self._load(self._seed)
-        self.register("directory.lookup_user", self._lookup_user, mutating=False)
-        self.register("directory.verify_manager", self._verify_manager, mutating=False)
+        self.register(
+            "directory.lookup_user",
+            self._lookup_user,
+            mutating=False,
+            normalize=email_args(("email",)),
+        )
+        self.register(
+            "directory.verify_manager",
+            self._verify_manager,
+            mutating=False,
+            normalize=email_args(("requester",), ("target",)),
+        )
 
     def reset(self) -> None:
         super().reset()

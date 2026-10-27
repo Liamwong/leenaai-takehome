@@ -36,6 +36,8 @@ from helix_agent.clock import Clock, SystemClock
 from helix_agent.keys import canonical_json
 
 Handler = Callable[[dict[str, Any]], dict[str, Any]]
+# Rewrites args into canonical form before hashing and before the handler runs.
+Normalizer = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class MockError(Exception):
@@ -92,6 +94,7 @@ class IdempotencyRecord:
 class _ToolSpec:
     handler: Handler
     mutating: bool
+    normalize: Normalizer | None = None
 
 
 class MockService:
@@ -103,10 +106,17 @@ class MockService:
 
     # -- registration -------------------------------------------------------
 
-    def register(self, tool: str, handler: Handler, *, mutating: bool) -> None:
+    def register(
+        self,
+        tool: str,
+        handler: Handler,
+        *,
+        mutating: bool,
+        normalize: Normalizer | None = None,
+    ) -> None:
         if tool in self._tools:
             raise ValueError(f"tool already registered: {tool}")
-        self._tools[tool] = _ToolSpec(handler, mutating)
+        self._tools[tool] = _ToolSpec(handler, mutating, normalize)
 
     @property
     def tools(self) -> frozenset[str]:
@@ -121,6 +131,11 @@ class MockService:
         if spec is None:
             raise UnknownTool(tool)
         args = copy.deepcopy(dict(args))
+        # Normalize before hashing: args that mean the same thing (e.g. "Alice@" and
+        # "alice@") must hash the same, or a replay with the same key is wrongly rejected
+        # as a conflict. The key recipes in helix_agent.keys already fold these forms.
+        if spec.normalize is not None:
+            args = spec.normalize(args)
 
         if not spec.mutating:
             # A read-only tool that writes would skip the idempotency store,

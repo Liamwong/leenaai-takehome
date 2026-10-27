@@ -6,7 +6,7 @@ from typing import Any
 
 from helix_agent.clock import Clock
 from helix_agent.mocks.core import InvalidArgument, MockService
-from helix_agent.mocks.directory import normalize_email
+from helix_agent.mocks.directory import email_args
 
 ITEMS = frozenset({"Travel Exception", "USB Exception", "Software", "Peripheral Catalog"})
 INITIAL_STATE = "SUBMITTED"
@@ -17,7 +17,12 @@ REQUEST_STATES = frozenset({INITIAL_STATE})
 class ServiceNowMock(MockService):
     def __init__(self, clock: Clock | None = None) -> None:
         super().__init__(clock)
-        self.register("servicenow.create_request", self._create_request, mutating=True)
+        self.register(
+            "servicenow.create_request",
+            self._create_request,
+            mutating=True,
+            normalize=email_args(("fields", "requester")),
+        )
 
     def _create_request(self, args: dict[str, Any]) -> dict[str, Any]:
         item = args["item"]
@@ -27,10 +32,6 @@ class ServiceNowMock(MockService):
         requester = fields.get("requester")
         if not isinstance(requester, str) or not requester.strip():
             raise InvalidArgument("fields.requester is required")
-        # Store the lower-case form so read-backs match the directory and keys.
-        requester = normalize_email(requester)
-        fields["requester"] = requester
-
         # The counter lives in _state, so a rolled-back call also rolls back its ID.
         number = (self._get("counter", "request") or {"n": 0})["n"] + 1
         self._put("counter", "request", {"n": number})

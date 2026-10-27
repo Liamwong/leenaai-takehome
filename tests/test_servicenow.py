@@ -43,6 +43,14 @@ def test_mixed_case_requester_is_stored_lower_case(snow):
     assert stored["fields"]["requester"] == ALICE
 
 
+def test_mixed_case_requester_retry_with_same_key_returns_same_request(snow):
+    key = keys.create_request(ALICE, "USB Exception", utc_day(snow.clock.now()))
+    first = create(snow, key=key)
+    second = create(snow, fields={"requester": "Alice@Helix.Example"}, key=key)
+    assert first == second
+    assert len(snow.snapshot()["state"]["request"]) == 1
+
+
 def test_same_requester_item_day_and_key_returns_same_id(snow):
     first = create(snow)
     second = create(snow)
@@ -80,3 +88,15 @@ def test_missing_requester_raises_and_stores_nothing(snow):
             "k1",
         )
     assert snow.snapshot()["state"] == {}
+
+
+@pytest.mark.parametrize("requester", [None, 12345, ["alice@helix.example"]])
+def test_non_string_requester_is_rejected_and_stores_nothing(snow, requester):
+    with pytest.raises(InvalidArgument):
+        snow.call(
+            "servicenow.create_request",
+            {"item": "Software", "fields": {"requester": requester}},
+            "k1",
+        )
+    assert snow.snapshot()["state"] == {}
+    assert snow.replay_record("servicenow.create_request", "k1") is None

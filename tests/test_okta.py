@@ -77,6 +77,19 @@ def test_repeat_unlock_same_key_and_epoch_is_identical_and_unlocks_once(okta):
     assert read(okta)["locked"] is True
 
 
+def test_mixed_case_unlock_retry_with_same_key_is_a_replay(okta):
+    key = keys.unlock_account(ALICE, LOCK_E1)
+    first = okta.call("okta.unlock_account", {"user": ALICE, "lock_epoch": LOCK_E1}, key)
+    second = okta.call(
+        "okta.unlock_account", {"user": "Alice@Helix.Example", "lock_epoch": LOCK_E1}, key
+    )
+    assert first == second == {"user": ALICE, "locked": False, "last_unlocked_epoch": LOCK_E1}
+    # Re-lock, then replay with mixed case. The handler must not run again, so it stays locked.
+    okta.lock(ALICE, LOCK_E1)
+    okta.call("okta.unlock_account", {"user": "ALICE@helix.example", "lock_epoch": LOCK_E1}, key)
+    assert read(okta)["locked"] is True
+
+
 def test_relock_with_new_epoch_unlocks_again(okta):
     okta.call(
         "okta.unlock_account",
@@ -187,3 +200,27 @@ def test_reset_restores_seed(okta):
     )
     okta.reset()
     assert read(okta)["sessions_active"] == 3
+
+
+def test_missing_user_is_rejected_and_changes_nothing(okta):
+    before = okta.snapshot()["state"]
+    with pytest.raises(KeyError):
+        okta.call(
+            "okta.unlock_account",
+            {"lock_epoch": LOCK_E1},
+            keys.unlock_account(ALICE, LOCK_E1),
+        )
+    assert okta.snapshot()["state"] == before
+    assert read(okta)["locked"] is True
+
+
+def test_non_string_user_is_rejected_and_changes_nothing(okta):
+    before = okta.snapshot()["state"]
+    with pytest.raises(AttributeError):
+        okta.call(
+            "okta.unlock_account",
+            {"user": 12345, "lock_epoch": LOCK_E1},
+            keys.unlock_account(ALICE, LOCK_E1),
+        )
+    assert okta.snapshot()["state"] == before
+    assert read(okta)["locked"] is True

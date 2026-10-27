@@ -7,7 +7,7 @@ from typing import Any
 
 from helix_agent.clock import Clock
 from helix_agent.mocks.core import InvalidArgument, MockService, UnknownEntity
-from helix_agent.mocks.directory import DirectoryMock, normalize_email
+from helix_agent.mocks.directory import DirectoryMock, email_args
 
 MAX_MINUTES = 60
 
@@ -17,11 +17,16 @@ class EndpointMock(MockService):
         super().__init__(clock)
         # Ownership is checked against the directory, the source of truth for devices.
         self.directory = directory
-        self.register("endpoint.grant_admin", self._grant_admin, mutating=True)
+        self.register(
+            "endpoint.grant_admin",
+            self._grant_admin,
+            mutating=True,
+            normalize=email_args(("user",)),
+        )
 
     def _grant_admin(self, args: dict[str, Any]) -> dict[str, Any]:
-        # Store the directory's lower-case form so read-backs match other mocks and keys.
-        user = normalize_email(args["user"])
+        # args["user"] is already lower-case: call() applies the normalizer above.
+        user = args["user"]
         device_id = args["device_id"]
         minutes = args["minutes"]
         # bool is a subclass of int, so it must be excluded explicitly.
