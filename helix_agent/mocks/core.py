@@ -17,6 +17,8 @@ MockService and register one handler per tool. The base class guarantees:
   change is undone.
 - read_state() reads the stored entity, independent of any write response,
   so callers can verify an effect instead of trusting the reply.
+- ID counters for new records must live in self._state, so that rollback
+  also rolls back the counter when a handler raises.
 
 Keys are scoped per tool. Key recipes live in helix_agent.keys.
 """
@@ -34,6 +36,8 @@ from helix_agent.clock import Clock, SystemClock
 from helix_agent.keys import canonical_json
 
 Handler = Callable[[dict[str, Any]], dict[str, Any]]
+# Rewrites args into canonical form before hashing and before the handler runs.
+Normalizer = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class MockError(Exception):
@@ -69,6 +73,14 @@ class ReplayConflict(MockError):
         self.idempotency_key = idempotency_key
 
 
+class InvalidArgument(MockError, ValueError):
+    """A tool was called with an argument the mock's hard validation rejects."""
+
+
+class UnknownEntity(MockError, LookupError):
+    """A tool referred to a user or asset that the mock does not hold."""
+
+
 @dataclass(frozen=True)
 class IdempotencyRecord:
     tool: str
@@ -82,6 +94,7 @@ class IdempotencyRecord:
 class _ToolSpec:
     handler: Handler
     mutating: bool
+    normalize: Normalizer | None = None
 
 
 class MockService:
@@ -93,10 +106,17 @@ class MockService:
 
     # -- registration -------------------------------------------------------
 
-    def register(self, tool: str, handler: Handler, *, mutating: bool) -> None:
+    def register(
+        self,
+        tool: str,
+        handler: Handler,
+        *,
+        mutating: bool,
+        normalize: Normalizer | None = None,
+    ) -> None:
         if tool in self._tools:
             raise ValueError(f"tool already registered: {tool}")
-        self._tools[tool] = _ToolSpec(handler, mutating)
+        self._tools[tool] = _ToolSpec(handler, mutating, normalize)
 
     @property
     def tools(self) -> frozenset[str]:
@@ -111,6 +131,11 @@ class MockService:
         if spec is None:
             raise UnknownTool(tool)
         args = copy.deepcopy(dict(args))
+        # Normalize before hashing: args that mean the same thing (e.g. "Alice@" and
+        # "alice@") must hash the same, or a replay with the same key is wrongly rejected
+        # as a conflict. The key recipes in helix_agent.keys already fold these forms.
+        if spec.normalize is not None:
+            args = spec.normalize(args)
 
         if not spec.mutating:
             # A read-only tool that writes would skip the idempotency store,
